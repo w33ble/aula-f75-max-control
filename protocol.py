@@ -10,7 +10,7 @@ from datetime import datetime
 import hid
 
 VID, PID = 0x0C45, 0x800A
-CMD_USAGE_PAGE = 0xFF13
+CMD_INTERFACE = 3
 PACKET = 64
 DELAY = 0.035
 
@@ -19,7 +19,7 @@ TABLE_SIZE = 0x240  # 144 four-byte slots (per-key colour or remap), sent as 9 p
 BLOCK_COLORS, BLOCK_REMAP_BASE, BLOCK_REMAP_FN, BLOCK_SETTINGS = 0x23, 0x11, 0x27, 0x17
 MACRO_BUFFER_MAX = 0xE00
 
-DISPLAY_USAGE_PAGE = 0xFF68
+DISPLAY_INTERFACE = 2
 SCREEN_SIZE = 128
 SCREEN_HEADER = 256  # [0] frame count, [1 + i] frame delay in 2 ms units
 SCREEN_FRAME_BYTES = SCREEN_SIZE * SCREEN_SIZE * 2  # RGB565 little-endian
@@ -42,8 +42,12 @@ class KeyboardNotFound(RuntimeError):
     pass
 
 
-def find_path(usage_page: int) -> bytes:
-    path = next((d["path"] for d in hid.enumerate(VID, PID) if d["usage_page"] == usage_page), None)
+def find_path(interface_number: int) -> bytes:
+    path = next(
+        (d["path"] for d in hid.enumerate(VID, PID)
+         if d.get("interface_number") == interface_number),
+        None,
+    )
 
     if path is None:
         raise KeyboardNotFound("AULA F75 Max not found on USB; connect the cable and switch to wired mode.")
@@ -58,7 +62,7 @@ def screen_chunks(frame_count: int) -> int:
 class Keyboard:
     def __init__(self):
         self.dev = hid.device()
-        self.dev.open_path(find_path(CMD_USAGE_PAGE))
+        self.dev.open_path(find_path(CMD_INTERFACE))
 
     def close(self):
         self.dev.close()
@@ -173,7 +177,7 @@ class Keyboard:
 
         chunks = len(stream) // SCREEN_CHUNK
         display = hid.device()
-        display.open_path(find_path(DISPLAY_USAGE_PAGE))
+        display.open_path(find_path(DISPLAY_INTERFACE))
 
         try:
             self.send_ack(packet(0x04, 0x18))
